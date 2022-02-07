@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-from torch.nn.utils.parametrizations import spectral_norm
 from torch.autograd import Variable
 
 class ConvGRUCell(torch.nn.Module):
@@ -54,7 +53,10 @@ class ConvGRU(torch.nn.Module):
 
     def forward(self, x_sequence, init_hidden=None):
         """
-        x_sequence shape -> (batch_size, time, c, width, height)
+        Args:
+            x_sequence shape -> (batch_size, time, c, width, height)
+        Return:
+            outputs shape -> (time, batch_size, c, width, height)
         """
         seq_len = x_sequence.shape[1]
         dtype = x_sequence.type()
@@ -70,6 +72,7 @@ class ConvGRU(torch.nn.Module):
 
         outputs = torch.stack(out_list, dim=0)
 
+        
         return outputs
 
 
@@ -82,7 +85,7 @@ if __name__ == '__main__':
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-
+    print('Hey')
     input_tensor = torch.rand(32, 18, channels, height, width).cuda()
     outputs = model(input_tensor)
-    print(outputs.dtype)
+    print(outputs.shape)

@@ -1,5 +1,7 @@
 import numpy as np
-from torch.nn.utils.parametrizations import spectral_norm
+#TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
+#from torch.nn.utils.parametrizations import spectral_norm
+from torch.nn.utils import spectral_norm
 import torch
 from torch.nn import functional as F
 import einops
@@ -31,7 +33,7 @@ class GBlock(torch.nn.Module):
         if x.shape[1] != self.out_channel:
             res = self.conv_1x1(x)
         else:
-            res = x
+            res = x.clone()
 
         ## first 
         x = self.bn1(x)
@@ -115,13 +117,12 @@ class DBlock(torch.nn.Module):
             conv(out_channel, out_channel, kernel_size=3, padding=1)
         )
 
-
     def forward(self, x):
         ## Residual block
         if x.shape[1] != self.out_channel:
             res = self.conv1x1(x)
         else:
-            res = x
+            res = x.clone()
         if self.apply_down:
             res = self.avg_pool(res)
 
@@ -135,7 +136,7 @@ class DBlock(torch.nn.Module):
             x = self.avg_pool(x)
 
         ## connect
-        y = x + res
+        y = res + x
 
         return y
 

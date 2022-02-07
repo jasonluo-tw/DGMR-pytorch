@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils.parametrizations import spectral_norm
-from common import DBlock
+#TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
+#from torch.nn.utils.parametrizations import spectral_norm
+from torch.nn.utils import spectral_norm
+from .common import DBlock
 
 class TemporalDiscriminator(nn.Module):
     def __init__(self, in_channel: int):
@@ -26,7 +28,7 @@ class TemporalDiscriminator(nn.Module):
 
         self.Dlist = nn.ModuleList()
         for i in range(3):
-            chn *= 2
+            chn = chn * 2
             self.Dlist.append(
                 DBlock(in_channel=chn,
                        out_channel=2 * chn,
@@ -117,7 +119,7 @@ class SpatialDiscriminator(nn.Module):
         perm = torch.randperm(x.shape[1])
         random_idx = perm[:8]
         features = []
-
+        ##TODO: seems that forloop can not be used??
         for ii in random_idx:
             fea = x[:, ii, :, :, :]
             fea = self.down_sample(fea)
@@ -134,7 +136,6 @@ class SpatialDiscriminator(nn.Module):
             fea = torch.sum(self.relu(fea), dim=[2, 3])
             fea = self.bn(fea)
             fea = self.fc(fea)
-
             features.append(fea)
 
         y = torch.stack(features, dim=1)

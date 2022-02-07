@@ -2,12 +2,14 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-from torch.nn.utils.parametrizations import spectral_norm
+#TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
+#from torch.nn.utils.parametrizations import spectral_norm
+from torch.nn.utils import spectral_norm
 from torch.distributions import normal
 import einops
 
-from ConvGRU import ConvGRU
-from common import GBlock, Up_GBlock, LBlock, AttentionLayer, DBlock
+from .ConvGRU import ConvGRU
+from .common import GBlock, Up_GBlock, LBlock, AttentionLayer, DBlock
 
 class Sampler(nn.Module):
     def __init__(self, tstep, chs=768, up_step=4):
@@ -78,6 +80,8 @@ class Sampler(nn.Module):
             seq_out = [self.conv1x1_list[i](h) for h in seq_out]
             seq_out = [self.gblock_list[i](h) for h in seq_out]
             seq_out = [self.upg_list[i](h) for h in seq_out]
+            ## output: seq_out list dim -> D * [N, C, H, W]
+            ## should stack at dim == 1 to become (N, D, C, H, W)
             seq_out = torch.stack(seq_out, dim=1)
 
         ## final output
