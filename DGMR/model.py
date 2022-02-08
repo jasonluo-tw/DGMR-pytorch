@@ -40,22 +40,3 @@ class Discriminator(nn.Module):
 
         return dis_out
 
-if __name__ == '__main__':
-    ## params 
-    tstep = 4
-    fstep = 8
-    batch_size = 10
-    in_c = 1
-    ## make model
-    gen = Generator(tstep=tstep)
-    dis = Discriminator(in_channel=in_c)
-    ## fake input
-    ## (N, D, C, H, W)
-    fake_input = torch.rand(batch_size, tstep, in_c, 256, 256)
-    fake_label = torch.rand(batch_size, fstep, in_c, 256, 256)
-
-    gen_output = gen(fake_input)
-    print(gen_output.shape)
-
-    dis_output = dis(fake_label)
-    print(dis_output.shape)

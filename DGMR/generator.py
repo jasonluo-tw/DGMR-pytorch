@@ -101,7 +101,7 @@ class Sampler(nn.Module):
 
 ##TODO: Now only generate one sample, and not one batch
 class LatentConditionStack(nn.Module):
-    def __init__(self, in_shape):
+    def __init__(self, in_shape, attn=True):
         """
         in_shape dims -> (8, 8, 8) -> (C, H, W)
         """
@@ -109,6 +109,7 @@ class LatentConditionStack(nn.Module):
 
         self.in_shape = in_shape
         self.in_channel = in_shape[0]
+        self.attn = attn
 
         self.dist = normal.Normal(loc=0.0, scale=1.0)
 
@@ -124,7 +125,8 @@ class LatentConditionStack(nn.Module):
         self.l1 = LBlock(self.in_channel, 24)
         self.l2 = LBlock(24, 48)
         self.l3 = LBlock(48, 192)
-        self.attn = AttentionLayer(192, 192)
+        if self.attn:
+            self.attn = AttentionLayer(192, 192)
         self.l4 = LBlock(192, 768)
 
     def forward(self, batch_size=1):
@@ -138,7 +140,8 @@ class LatentConditionStack(nn.Module):
         z = self.l1(z)
         z = self.l2(z)
         z = self.l3(z)
-        z = self.attn(z)
+        if self.attn:
+            z = self.attn(z)
 
         z = self.l4(z)
 
@@ -207,18 +210,3 @@ class ContextConditionStack(nn.Module):
         
         return stacked
 
-if __name__ == '__main__':
-    tstep = 4
-    batch_size = 10
-    x_chs = 1
-    ## h = 256
-    ## w = 256
-    ## fake input radar images -> (N, D, C, H, W)
-    input_x = torch.rand(batch_size, tstep, x_chs, 256, 256)
-
-    ## produce zlatent for Sampler
-    LatentStack = LatentConditionStack((8, 8, 8))
-    ## produce context latent
-    ContextStack = ContextConditionStack()
-
-    model = Sampler(tstep=tstep, chs=768, up_step=4)

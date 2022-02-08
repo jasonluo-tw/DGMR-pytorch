@@ -75,17 +75,3 @@ class ConvGRU(torch.nn.Module):
         
         return outputs
 
-
-if __name__ == '__main__':
-
-    height = width = 16
-    channels = 8
-    out_channel = 16
-    model = ConvGRU((height, width), channels, out_channel, 3)
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    print('Hey')
-    input_tensor = torch.rand(32, 18, channels, height, width).cuda()
-    outputs = model(input_tensor)
-    print(outputs.shape)

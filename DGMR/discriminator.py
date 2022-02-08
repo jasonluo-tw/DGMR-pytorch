@@ -144,25 +144,3 @@ class SpatialDiscriminator(nn.Module):
 
         return y
 
-if __name__ == '__main__':
-    height = width = 256
-    channels = 1
-    
-    ## (N, D, C, H, W)
-    input_tensor = torch.rand(8, 22, 1, 256, 256)
-
-    # Test temporal
-    model = TemporalDiscriminator(in_channel=1)
-    out = model(input_tensor)
-    print(out.shape)
-
-    model2 = SpatialDiscriminator(in_channel=1)
-    out2 = model(input_tensor)
-    print(out2.shape)
-
-
-
-
-
-
-
