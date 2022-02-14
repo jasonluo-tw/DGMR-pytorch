@@ -2,7 +2,8 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-#TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
+#TODO: doesn't know why this(torch.nn.utils.parametrizations.spectral_norm) will cause inplace problem in forloop operation (pytorch 1.09) which is used in DBlock
+#TODO: but it is OK in pytorch v1.10
 from torch.nn.utils.parametrizations import spectral_norm
 #from torch.nn.utils import spectral_norm
 from torch.distributions import normal
