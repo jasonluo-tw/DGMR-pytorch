@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 #TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
-#from torch.nn.utils.parametrizations import spectral_norm
-from torch.nn.utils import spectral_norm
+from torch.nn.utils.parametrizations import spectral_norm
+#from torch.nn.utils import spectral_norm
 from .common import DBlock
 
 class TemporalDiscriminator(nn.Module):

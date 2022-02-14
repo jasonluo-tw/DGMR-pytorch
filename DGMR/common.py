@@ -1,7 +1,7 @@
 import numpy as np
 #TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
-#from torch.nn.utils.parametrizations import spectral_norm
-from torch.nn.utils import spectral_norm
+from torch.nn.utils.parametrizations import spectral_norm
+#from torch.nn.utils import spectral_norm
 import torch
 from torch.nn import functional as F
 import einops

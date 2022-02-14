@@ -3,8 +3,8 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 #TODO: doesn't know why this will cause inplace problem in forloop operation which is used in DBlock
-#from torch.nn.utils.parametrizations import spectral_norm
-from torch.nn.utils import spectral_norm
+from torch.nn.utils.parametrizations import spectral_norm
+#from torch.nn.utils import spectral_norm
 from torch.distributions import normal
 import einops
 
@@ -12,22 +12,32 @@ from .ConvGRU import ConvGRU
 from .common import GBlock, Up_GBlock, LBlock, AttentionLayer, DBlock
 
 class Sampler(nn.Module):
-    def __init__(self, tstep, chs=768, up_step=4):
+    def __init__(self, in_shape, in_channels, pred_step, base_channels=24, up_step=4):
+        """
+        up_step should be the same as down_step in context-condition-stack
+
+        """
         super().__init__()
-        self.tstep = tstep
+        s_w = in_shape[0] / 2**(up_step+1)
+        s_h = in_shape[1] / 2**(up_step+1)
+        base_c = base_channels
+
+        self.pred_step = pred_step
         self.up_steps = up_step
         self.convgru_list = nn.ModuleList()
         self.conv1x1_list = nn.ModuleList()
         self.gblock_list  = nn.ModuleList()
         self.upg_list     = nn.ModuleList()
+
         for i in range(self.up_steps):
             ## different scale
-            H_W = 8 * (i+1)
-            chs1 = chs // 2**(i)
-            chs2 = chs // 2**(i+1)
+            width = s_w * (i+1)
+            height = s_h * (i+1)
+            chs1 = base_c * 2**(self.up_steps-i+1) * in_channels
+            chs2 = base_c * 2**(self.up_steps-i) * in_channels
             ## convgru 
             self.convgru_list.append(
-                ConvGRU((H_W, H_W), chs1, chs2, 3)
+                ConvGRU((width, height), chs1, chs2, 3)
             )
             ## conv1x1
             self.conv1x1_list.append(
@@ -69,7 +79,7 @@ class Sampler(nn.Module):
             )
         ## repeat time step
         latents = einops.repeat(
-            latents, "b d c h w -> b (repeat d) c h w", repeat=self.tstep
+            latents, "b d c h w -> b (repeat d) c h w", repeat=self.pred_step
         )
         seq_out = latents
         ## init_states should be reversed
@@ -101,37 +111,47 @@ class Sampler(nn.Module):
 
 ##TODO: Now only generate one sample, and not one batch
 class LatentConditionStack(nn.Module):
-    def __init__(self, in_shape, attn=True):
+    def __init__(self, in_shape, out_channels, use_cuda, attn=True):
         """
-        in_shape dims -> (8, 8, 8) -> (C, H, W)
+        in_shape dims -> e.g. (8, 8) -> (H, W)
+        base_c is 1/96 of out_channels
         """
         super().__init__()
-
-        self.in_shape = in_shape
-        self.in_channel = in_shape[0]
+   
+        self.base_c = out_channels // 96
+        self.out_channels = out_channels
         self.attn = attn
+        self.use_cuda = use_cuda
+        self.inshape = [self.base_c] + list(in_shape)
 
+        ## define the distribution
         self.dist = normal.Normal(loc=0.0, scale=1.0)
 
         self.conv3x3 = spectral_norm(
             nn.Conv2d(
-                in_channels=self.in_channel,
-                out_channels=self.in_channel,
+                in_channels=self.base_c,
+                out_channels=self.base_c,
                 kernel_size=(3, 3),
                 padding=1
             )
         )
 
-        self.l1 = LBlock(self.in_channel, 24)
-        self.l2 = LBlock(24, 48)
-        self.l3 = LBlock(48, 192)
+        cc = self.base_c
+        self.l1 = LBlock(cc, cc*3)
+        self.l2 = LBlock(cc*3, cc*6)
+        self.l3 = LBlock(cc*6, cc*24)
         if self.attn:
-            self.attn = AttentionLayer(192, 192)
-        self.l4 = LBlock(192, 768)
+            self.attn = AttentionLayer(cc*24,cc*24)
+        self.l4 = LBlock(cc*24, self.out_channels)
 
-    def forward(self, batch_size=1):
-        target_shape = [batch_size] + [*self.in_shape]
+    def forward(self, x, batch_size=1):
+        target_shape = [batch_size] + [*self.inshape]
         z = self.dist.sample(target_shape)
+        if self.use_cuda:
+            #z = z.to("cuda")
+            ## with lightening
+            z = z.type_as(x)
+
         
         ## first conv
         z = self.conv3x3(z)
@@ -148,21 +168,32 @@ class LatentConditionStack(nn.Module):
         return z
 
 class ContextConditionStack(nn.Module):
-    def __init__(self, in_channels: int = 1,
-                 final_channel: int = 384):
+    def __init__(self, 
+            in_channels: int = 1,
+            base_channels: int = 24, 
+            down_step: int = 4, 
+            prev_step: int = 4):
         """
+        base_channels: e.g. 24 -> output_channel: 384
+        output_channel: base_c*in_c*2**(down_step-2) * prev_step
+        down_step: int
+        prev_step: int
         """
         super().__init__()
         self.in_channels = in_channels
-        
-        self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
-
+        self.down_step = down_step 
+        self.prev_step = prev_step
+        ###
+        base_c = base_channels
         in_c = in_channels
+       
         ## different scales channels
-        chs = [4*in_c, 24*in_c, 48*in_c, 96*in_c, 192*in_c]
+        chs = [4*in_c] + [base_c*in_c*2**i for i in range(down_step)]
+
+        self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
         self.Dlist = nn.ModuleList()
         self.convList = nn.ModuleList()
-        for i in range(len(chs)-1):
+        for i in range(down_step):
             self.Dlist.append(
                 DBlock(in_channel=chs[i],
                        out_channel=chs[i+1],
@@ -170,8 +201,8 @@ class ContextConditionStack(nn.Module):
             )
 
             self.convList.append(
-                nn.Conv2d(in_channels=4 * chs[i+1],
-                          out_channels=4 * chs[i+1] // 2,
+                nn.Conv2d(in_channels=prev_step * chs[i+1],
+                          out_channels=prev_step * chs[i+1] // 2,
                           kernel_size=(3, 3),
                           padding=1)
             )
@@ -180,17 +211,20 @@ class ContextConditionStack(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
         ## input dims -> (N, D, C, H, W)
+        """
         x = self.space_to_depth(x)
-        steps = x.shape[1]
-
+        tsteps = x.shape[1]
+        assert tsteps == self.prev_step
+            
         ## different feature index represent different scale
-        features = [[] for i in range(steps)]
+        features = [[] for i in range(tsteps)]
 
-        for st in range(steps):
+        for st in range(tsteps):
             in_x = x[:, st, :, :, :]
             ## in_x -> (N, C, H, W)
-            for scale in range(4):
+            for scale in range(self.down_step):
                 in_x = self.Dlist[scale](in_x)
                 features[scale].append(in_x)
         
