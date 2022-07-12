@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from torch.nn.utils.parametrizations import spectral_norm
 from torch.autograd import Variable
 
 class ConvGRUCell(torch.nn.Module):
@@ -8,18 +9,22 @@ class ConvGRUCell(torch.nn.Module):
         padding = kernel_size//2
         self.out_channel = out_channel
 
-        self.conv1 = torch.nn.Conv2d(
-            in_channels=in_channel+out_channel,
-            out_channels=2*out_channel,
-            kernel_size=kernel_size,
-            padding=padding
+        self.conv1 = spectral_norm(
+            torch.nn.Conv2d(
+                in_channels=in_channel+out_channel,
+                out_channels=2*out_channel,
+                kernel_size=kernel_size,
+                padding=padding
+            )
         )
 
-        self.conv2 = torch.nn.Conv2d(
-            in_channels=in_channel+out_channel,
-            out_channels=out_channel,
-            kernel_size=kernel_size,
-            padding=padding
+        self.conv2 = spectral_norm(
+            torch.nn.Conv2d(
+                in_channels=in_channel+out_channel,
+                out_channels=out_channel,
+                kernel_size=kernel_size,
+                padding=padding
+            )
         )
 
     def forward(self, x, h_st):

@@ -13,8 +13,9 @@ class GBlock(torch.nn.Module):
         self.in_channel = in_channel
         self.out_channel = out_channel
 
-        self.bn1 = torch.nn.BatchNorm2d(in_channel)
-        self.bn2 = torch.nn.BatchNorm2d(in_channel)
+        ##TODO: close batch
+        #self.bn1 = torch.nn.BatchNorm2d(in_channel)
+        #self.bn2 = torch.nn.BatchNorm2d(out_channel)
 
         self.relu = torch.nn.ReLU()
         ## conv1x1
@@ -26,22 +27,22 @@ class GBlock(torch.nn.Module):
             torch.nn.Conv2d(in_channel, out_channel, kernel_size=3, padding=1)
         )
         self.conv3x3_2 = spectral_norm(
-            torch.nn.Conv2d(in_channel, out_channel, kernel_size=3, padding=1)
+            torch.nn.Conv2d(out_channel, out_channel, kernel_size=3, padding=1)
         )
 
     def forward(self, x: torch.Tensor):
         ## if shape is different then applied
         if x.shape[1] != self.out_channel:
-            res = self.conv_1x1(x)
+            res = self.conv1x1(x)
         else:
             res = x.clone()
 
         ## first 
-        x = self.bn1(x)
+        #x = self.bn1(x)
         x = self.relu(x)
         x = self.conv3x3_1(x)
         ## second
-        x = self.bn2(x)
+        #x = self.bn2(x)
         x = self.relu(x)
         x = self.conv3x3_2(x)
 
@@ -55,9 +56,10 @@ class Up_GBlock(torch.nn.Module):
         self.in_channel = in_channel
         self.out_channel = int(in_channel / 2)
 
-        self.bn1 = torch.nn.BatchNorm2d(in_channel)
-        #self.bn2 = torch.nn.BatchNorm2d(self.out_channel)
-        self.bn2 = torch.nn.BatchNorm2d(in_channel)
+        ##TODO: close batch
+        #self.bn1 = torch.nn.BatchNorm2d(in_channel)
+        ##self.bn2 = torch.nn.BatchNorm2d(self.out_channel)
+        #self.bn2 = torch.nn.BatchNorm2d(in_channel)
 
         self.relu = torch.nn.ReLU()
         self.up = torch.nn.Upsample(scale_factor=2, mode='nearest')
@@ -77,12 +79,12 @@ class Up_GBlock(torch.nn.Module):
         res = self.up(x)
         res = self.conv1x1(res)
 
-        x = self.bn1(x)
+        #x = self.bn1(x)
         x = self.relu(x)
         x = self.up(x)
         x = self.conv3x3_1(x)
 
-        x = self.bn2(x)
+        #x = self.bn2(x)
         x = self.relu(x)
         x = self.conv3x3_2(x)
 
@@ -120,6 +122,7 @@ class DBlock(torch.nn.Module):
 
     def forward(self, x):
         ## Residual block
+        ##TODO 2D x 3D C channel index is different
         if x.shape[1] != self.out_channel:
             res = self.conv1x1(x)
         else:

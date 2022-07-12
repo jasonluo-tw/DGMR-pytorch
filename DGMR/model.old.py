@@ -18,13 +18,12 @@ class Generator(nn.Module):
         super().__init__()
         width  = in_shape[0]
         height = in_shape[1]
-        #assert width % (2*2**down_step) == 0
-        #assert height % (2*2**down_step) == 0
+        assert width % (2*2**down_step) == 0
+        assert height % (2*2**down_step) == 0
         s_w = width // (2 * 2**down_step)
         s_h = height // (2 * 2**down_step)
         out_channels = base_channels * 2**(down_step-2) * prev_step * in_channels
         ## (batch, H, W)
-        self.batch_size = batch_size
 
         self.latentStack = LatentConditionStack(
                 in_shape = (s_w, s_h),
@@ -52,8 +51,7 @@ class Generator(nn.Module):
         x: input seq -> dims (N, D, C, H, W)
         """
         context_inits = self.contextStack(x)
-        batch_size = context_inits[0].shape[0]
-        zlatent = self.latentStack(x, batch_size=batch_size)
+        zlatent = self.latentStack(x, batch_size=1)
         pred = self.sampler(zlatent, context_inits)
 
         return pred
@@ -64,13 +62,15 @@ class Discriminator(nn.Module):
         self.spatial = SpatialDiscriminator(in_channel=in_channels)
         self.temporal = TemporalDiscriminator(in_channel=in_channels)
 
-    def forward(self, x, y):
+    def forward(self, input_seq, idx):
         """
-        x -> dims (N, D, C, H, W) e.g. input_frames
-        y -> dims (N, D, C, H, W) e.g. output_grames
+        input_seq -> dims (N, D, C, H, W) e.g. input_frames + pred(target)_frames
+        idx -> the starting index of prediction frame
         """
-        spatial_out  = self.spatial(y)
-        temporal_out = self.temporal(torch.cat([x, y], dim=1))
+        ff = [i for i in range(idx, input_seq.shape[1])]
+        spatial_out = self.spatial(input_seq[:, ff, :, :, :])
+
+        temporal_out = self.temporal(input_seq)
 
         dis_out = torch.cat([spatial_out, temporal_out], dim=1)
 

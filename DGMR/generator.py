@@ -56,7 +56,8 @@ class Sampler(nn.Module):
             )
 
             ## output
-            self.bn = nn.BatchNorm2d(chs2)
+            ##TODO: close Batch
+            #self.bn = nn.BatchNorm2d(chs2)
             self.relu = nn.ReLU()
             self.last_conv1x1 = spectral_norm(
                 nn.Conv2d(in_channels=chs2,
@@ -72,6 +73,7 @@ class Sampler(nn.Module):
         """
         ## expand time dims at axis=1
         latents = torch.unsqueeze(latents, dim=1)
+
         ## repeat batch_size 
         if latents.shape[0] == 1:
             ## expand batch
@@ -100,7 +102,7 @@ class Sampler(nn.Module):
         output = []
         for t in range(seq_out.shape[1]):
             y = seq_out[:, t, :, :, :]
-            y = self.bn(y)
+            #y = self.bn(y)
             y = self.relu(y)
             y = self.last_conv1x1(y)
             y = self.depth_to_sapce(y)
@@ -115,11 +117,15 @@ class LatentConditionStack(nn.Module):
     def __init__(self, in_shape, out_channels, use_cuda, attn=True):
         """
         in_shape dims -> e.g. (8, 8) -> (H, W)
-        base_c is 1/96 of out_channels
+        x) base_c is 1/96 of out_channels
+        base_c is set to 4
         """
         super().__init__()
-   
+ 
         self.base_c = out_channels // 96
+        if self.base_c < 4:
+            self.base_c = 4
+
         self.out_channels = out_channels
         self.attn = attn
         self.use_cuda = use_cuda
@@ -148,6 +154,7 @@ class LatentConditionStack(nn.Module):
     def forward(self, x, batch_size=1):
         target_shape = [batch_size] + [*self.inshape]
         z = self.dist.sample(target_shape)
+
         if self.use_cuda:
             #z = z.to("cuda")
             ## with lightening
@@ -168,6 +175,7 @@ class LatentConditionStack(nn.Module):
 
         return z
 
+##TODO: modification(Change the amount of parameters)
 class ContextConditionStack(nn.Module):
     def __init__(self, 
             in_channels: int = 1,
@@ -189,8 +197,8 @@ class ContextConditionStack(nn.Module):
         in_c = in_channels
        
         ## different scales channels
-        chs = [4*in_c] + [base_c*in_c*2**i for i in range(down_step)]
-
+        chs = [4*in_c] + [base_c*in_c*2**(i+1) for i in range(down_step)]
+        
         self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
         self.Dlist = nn.ModuleList()
         self.convList = nn.ModuleList()
@@ -202,10 +210,12 @@ class ContextConditionStack(nn.Module):
             )
 
             self.convList.append(
-                nn.Conv2d(in_channels=prev_step * chs[i+1],
-                          out_channels=prev_step * chs[i+1] // 2,
-                          kernel_size=(3, 3),
-                          padding=1)
+                spectral_norm(
+                    nn.Conv2d(in_channels=prev_step * chs[i+1],
+                              out_channels=prev_step * chs[i+1] // 4,
+                              kernel_size=(3, 3),
+                              padding=1)
+                )
             )
 
         ## ReLU
@@ -220,18 +230,21 @@ class ContextConditionStack(nn.Module):
         assert tsteps == self.prev_step
             
         ## different feature index represent different scale
+        ## features
+        ## [scale1 -> [t1, t2, t3, t4], scale2 -> [t1, t2, t3, t4], scale3 -> [....]]
         features = [[] for i in range(tsteps)]
 
         for st in range(tsteps):
             in_x = x[:, st, :, :, :]
-            ## in_x -> (N, C, H, W)
+            ## in_x -> (Batch(N), C, H, W)
             for scale in range(self.down_step):
                 in_x = self.Dlist[scale](in_x)
                 features[scale].append(in_x)
         
         out_scale = []
         for i, cc in enumerate(self.convList):
-            ## after stacking, dims -> (N, D, C, H, W)
+            ## after stacking, dims -> (Batch, Time, C, H, W)
+            ## and mixing layer is to concat Time, C
             stacked = self._mixing_layer(torch.stack(features[i], dim=1))
             out = self.relu(cc(stacked))
             out_scale.append(out)
@@ -239,9 +252,9 @@ class ContextConditionStack(nn.Module):
         return out_scale
 
     def _mixing_layer(self, x):
-        # conver from (N, D, C, H, W) -> (N, D*C, H, W)
+        # conver from (N, Time, C, H, W) -> (N, Time*C, H, W)
         # Then apply Conv2d
-        stacked = einops.rearrange(x, "b t c h w -> b (c t) h w")
+        stacked = einops.rearrange(x, "b t c h w -> b (t c) h w")
         
         return stacked
 
