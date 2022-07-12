@@ -1,5 +1,6 @@
 # nowcasting_DGMR
 ### Still underconstruction
+### recently test model on Japan & Taiwan, and try to compare the performance to optical-flow based model
 
 ### How to use
 - execute `python train.py`, then it will start to run.
