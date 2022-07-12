@@ -4,7 +4,7 @@ import os
 
 class RadarDataSet(torch.utils.data.Dataset):
     def __init__(self, folder):
-        self.data_files = os.listdir(folder)
+        self.data_files = os.listdir(folder)[:10]
         self.folder = folder
 
     def __getitem__(self, idx):
@@ -24,22 +24,4 @@ class RadarDataSet(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data_files)
-
-
-if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    dset = RadarDataSet(folder='../data/training_data/training/all_training')
-    loader = torch.utils.data.DataLoader(dset, batch_size=32, num_workers=2, shuffle=True)
-
-    for i, j in loader:
-        kk = np.squeeze(np.concatenate((i[0], j[0]), axis=0))
-        for index, dd in enumerate(kk):
-            plt.subplot(3, 4, index+1)
-            plt.contourf(dd, levels=np.arange(0, 65, 2), cmap='rainbow')
-            
-        plt.savefig('test.png', bbox_inches='tight')
-
-        break
-
 

@@ -133,22 +133,24 @@ def test_gblock():
 
 #test_contextstack()
 #test_sampler()
-test_latentstack()
+#test_latentstack()
 
 #test_gblock()
 #test_temporal_dis()
 #test_spatial_dis()
 #test_discriminator()
 
-"""
-tstep = 4
-fstep = 4
-batch_size = 4
-in_c = 1
+model = Generator(1, (400, 400), 24,
+                  down_step=4, prev_step=4, pred_step=12, batch_size=2, use_cuda=True)
+
+fake_input = torch.ones((2, 4, 1, 400, 400))
+
+print(fake_input.shape)
 
 ## Get model
 #gen = Generator(tstep=fstep)
 
+"""
 fake_input = torch.ones((batch_size, 10, in_c, 8, 8))
 
 #g_opt = torch.optim.Adam(gen.parameters())

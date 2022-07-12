@@ -13,7 +13,7 @@ from DGMR_lightning_radar2 import DGMR_model
 
 ## load model
 model = DGMR_model(in_shape=(384, 384), base_channels=16, pred_step=12, down_step=4, grid_lambda=20)
-model = model.load_from_checkpoint('model_weight/v9_only_mse_cwb/DGMR-epoch=084-val_loss=7.4033.ckpt', in_shape=(384, 384), base_channels=16, pred_step=12, down_step=4)
+model = model.load_from_checkpoint('model_weight/v9_only_mse/final_model_radar_v9_only_mse.ckpt', in_shape=(384, 384), base_channels=16, pred_step=12, down_step=4)
 
 input_sample = torch.randn((1, 4, 1, 384, 384))
 
@@ -39,4 +39,4 @@ input_sample = torch.randn((1, 4, 1, 384, 384))
 
 
 ## torch to state_dict
-torch.save(model.generator.state_dict(), "state_dict_model/model_v9_TW_mse_ep84.pt")
+torch.save(model.generator.state_dict(), "state_dict_model/model_v9_JP_mse_ep84.pt")
