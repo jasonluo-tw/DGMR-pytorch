@@ -19,8 +19,8 @@ class Sampler(nn.Module):
 
         """
         super().__init__()
-        s_w = in_shape[0] / 2**(up_step+1)
-        s_h = in_shape[1] / 2**(up_step+1)
+        s_w = in_shape[0] // 2**(up_step+1)
+        s_h = in_shape[1] // 2**(up_step+1)
         base_c = base_channels
 
         self.pred_step = pred_step

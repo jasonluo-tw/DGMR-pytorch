@@ -74,7 +74,7 @@ class DGMR_model(pl.LightningModule):
         self.train_gen_only = train_gen_only
 
         if not self.train_gen_only:
-            self.discriminator = Discriminator(in_channels)
+            self.discriminator = Discriminator(in_channels, base_channels)
 
         ### set up loss
         self.g_loss   = [0, 0]
@@ -226,7 +226,7 @@ class DGMR_model(pl.LightningModule):
             self.reg_loss[0] += grid_cell_reg.cpu().detach().numpy()
             self.reg_loss[1] += 1
 
-        if self.global_iter % 500 == 0:
+        if self.global_iter % 1 == 0:
             logger.info('epoch:{:d},global_step:{:d},hinge_loss:{:.4f},grid_reg:{:.4f},lambda:{:.2f},dis_loss:{:.4f}'.format(
                 self.current_epoch,
                 self.global_iter,
@@ -256,6 +256,7 @@ class DGMR_model(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         X, Y = batch
         ###
+        """
         if self.valid_plot_flag:
             xx = X[0:5]
             yy = Y[0:5]
@@ -266,6 +267,7 @@ class DGMR_model(pl.LightningModule):
             self.valid_plot_flag = False
         
             del xx, yy, preds
+        """
 
         ## calculate error metrics
         Y_hat = self.generator(X)

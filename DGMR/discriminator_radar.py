@@ -8,7 +8,7 @@ from .common import DBlock
 import einops
 
 class TemporalDiscriminator(nn.Module):
-    def __init__(self, in_channel: int):
+    def __init__(self, in_channel: int, base_c: int = 24):
         super().__init__()
         self.in_channel = in_channel
         
@@ -19,7 +19,7 @@ class TemporalDiscriminator(nn.Module):
 
         ## in_channel, out_channel
         ## Conv3D -> (N, C, D, H, W)
-        chn = 48 * in_channel
+        chn = base_c * 2 * in_channel
         self.d3_1 = DBlock(in_channel=in_channel * 4,
                            out_channel=chn,
                            conv_type='3d', apply_relu=False, apply_down=True)
@@ -30,8 +30,8 @@ class TemporalDiscriminator(nn.Module):
 
         self.Dlist = nn.ModuleList()
         ##TODO: original is 3
-        #for i in range(3):
-        for i in range(2):
+        for i in range(3):
+        #for i in range(2):
             chn = chn * 2
             self.Dlist.append(
                 DBlock(in_channel=chn,
@@ -86,7 +86,7 @@ class TemporalDiscriminator(nn.Module):
         return y
 
 class SpatialDiscriminator(nn.Module):
-    def __init__(self, in_channel: int):
+    def __init__(self, in_channel: int, base_c: int = 24):
         super().__init__()
         self.in_channel = in_channel
 
@@ -97,7 +97,7 @@ class SpatialDiscriminator(nn.Module):
         self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
 
         ## first Dblock doesn't apply relu 
-        chn = 24 * in_channel
+        chn = base_c * in_channel
         self.d1 = DBlock(in_channel=in_channel * 4,
                          out_channel=chn*2,
                          conv_type='2d', apply_relu=False, apply_down=True)

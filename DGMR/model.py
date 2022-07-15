@@ -59,10 +59,10 @@ class Generator(nn.Module):
         return pred
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, base_channels):
         super().__init__()
-        self.spatial = SpatialDiscriminator(in_channel=in_channels)
-        self.temporal = TemporalDiscriminator(in_channel=in_channels)
+        self.spatial = SpatialDiscriminator(in_channel=in_channels, base_c=base_channels)
+        self.temporal = TemporalDiscriminator(in_channel=in_channels, base_c=base_channels)
 
     def forward(self, x, y):
         """

@@ -28,6 +28,27 @@ class ConvGRUCell(torch.nn.Module):
         )
 
     def forward(self, x, h_st):
+        """
+        x -> dim (Batch, channels*2, width, height)
+        h_st -> dim (Batch, channels, width, height)
+        """
+        x_shape = x.shape
+        h_shape = h_st.shape
+        ## resize width, height
+        if h_shape[2] > x_shape[2]:
+            w_l = 1    
+        else:
+            w_l = 0
+
+        if h_shape[3] > x_shape[3]:
+            h_b = 1
+        else:
+            h_b = 0
+
+        x = F.pad(x, (0, h_b, w_l, 0), "reflect")
+
+        #print(x.shape, h_st.shape)
+        ## 
         xx = torch.cat([x, h_st], dim=1)
         xx = self.conv1(xx)
         gamma, beta = torch.split(xx, self.out_channel, dim=1)
