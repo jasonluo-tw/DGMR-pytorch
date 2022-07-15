@@ -1,16 +1,19 @@
 import torch
 import numpy as np
 import os
+import gzip
 
 class RadarDataSet(torch.utils.data.Dataset):
     def __init__(self, folder):
-        self.data_files = os.listdir(folder)[:10]
+        ##TODO:
+        self.data_files = os.listdir(folder)
         self.folder = folder
 
     def __getitem__(self, idx):
-        data = np.load(os.path.join(self.folder, self.data_files[idx]))
+        f = gzip.open(os.path.join(self.folder, self.data_files[idx]), 'rb')
+        data = np.load(f).astype('float32') / 100.
         data = np.nan_to_num(data, nan=0.0)
-        data = data.astype('float32')
+        #data = data.astype('float32')
         ## if data >= 64, data = 64
         data = np.where(data > 64, 64, data)
         data = data / 64.
