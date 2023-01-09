@@ -3,7 +3,7 @@ __pycache__
 DGMR/__pycache__/
 .nvimlog
 model_weight/
-state_dict_model/
+infer_state_model/
 pics/
 log/
 trash/
