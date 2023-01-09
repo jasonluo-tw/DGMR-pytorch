@@ -39,4 +39,4 @@ input_sample = torch.randn((1, 4, 1, 384, 384))
 
 
 ## torch to state_dict
-torch.save(model.generator.state_dict(), "state_dict_model/model_v9_JP_mse_ep84.pt")
+torch.save(model.generator.state_dict(), "infer_state_model/model_v9_JP_mse_ep84.pt")

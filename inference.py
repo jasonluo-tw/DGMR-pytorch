@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 ###
-from DGMR_lightning_radar2 import DGMR_model
+from DGMR_lightning_radar import DGMR_model
 ###
 import sys
-from data_load import RadarDataSet
+from DGMR.data_load import RadarDataSet
 
 sys.path.append('/home/luo-j/subs')
 from plot import PLOT

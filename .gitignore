@@ -1,5 +1,3 @@
-test_code2.py
-test_code.py
 lightning_logs/
 __pycache__
 DGMR/__pycache__/
@@ -8,3 +6,5 @@ model_weight/
 state_dict_model/
 pics/
 log/
+trash/
+inference/
