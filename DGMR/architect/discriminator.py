@@ -14,6 +14,7 @@ class TemporalDiscriminator(nn.Module):
         
         ## (N, C, D, H, W)
         self.down_sample = nn.AvgPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
+        #self.down_sample = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
         ## (N, D, C, H, W)
         self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
 
@@ -31,7 +32,6 @@ class TemporalDiscriminator(nn.Module):
         self.Dlist = nn.ModuleList()
         ##TODO: original is 3
         for i in range(3):
-        #for i in range(2):
             chn = chn * 2
             self.Dlist.append(
                 DBlock(in_channel=chn,
@@ -92,6 +92,7 @@ class SpatialDiscriminator(nn.Module):
 
         ## (N, C, H, W)
         self.down_sample = nn.AvgPool2d(kernel_size=(2, 2), stride=(2, 2))
+        #self.down_sample = nn.AvgPool2d(kernel_size=(2, 2), stride=(2, 2))
 
         ## (N, C, H, W)
         self.space_to_depth = nn.PixelUnshuffle(downscale_factor=2)
@@ -105,7 +106,6 @@ class SpatialDiscriminator(nn.Module):
         self.Dlist = nn.ModuleList()
         ##TODO: original is 4
         for i in range(4):
-        #for i in range(3):
             chn = chn * 2
             self.Dlist.append(
                 DBlock(in_channel=chn,

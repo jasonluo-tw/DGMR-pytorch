@@ -64,7 +64,7 @@ class Sampler(nn.Module):
                           out_channels=4,
                           kernel_size=(1, 1))
             )
-            self.depth_to_sapce = nn.PixelShuffle(upscale_factor=2)
+            self.depth_to_space = nn.PixelShuffle(upscale_factor=2)
 
     def forward(self, latents, init_states):
         """
@@ -105,7 +105,7 @@ class Sampler(nn.Module):
             #y = self.bn(y)
             y = self.relu(y)
             y = self.last_conv1x1(y)
-            y = self.depth_to_sapce(y)
+            y = self.depth_to_space(y)
             output.append(y)
 
         output = torch.stack(output, dim=1)
@@ -151,9 +151,10 @@ class LatentConditionStack(nn.Module):
             self.attn = AttentionLayer(cc*24,cc*24)
         self.l4 = LBlock(cc*24, self.out_channels)
 
-    def forward(self, x, batch_size=1):
+    def forward(self, x, batch_size=1, z=None):
         target_shape = [batch_size] + [*self.inshape]
-        z = self.dist.sample(target_shape)
+        if z is None:
+            z = self.dist.sample(target_shape)
 
         if self.use_cuda:
             #z = z.to("cuda")

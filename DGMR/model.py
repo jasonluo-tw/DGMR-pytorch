@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from .discriminator import TemporalDiscriminator, SpatialDiscriminator
-from .generator import Sampler, ContextConditionStack, LatentConditionStack
+from .architect.discriminator import TemporalDiscriminator, SpatialDiscriminator
+from .architect.generator import Sampler, ContextConditionStack, LatentConditionStack
 
 class Generator(nn.Module):
     def __init__(
