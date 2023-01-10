@@ -52,7 +52,7 @@ class DGMR_model(pl.LightningModule):
             gen_sample_nums: int = 6,
             train_gen_only: bool = False,
             opt_g_lr: float = 5e-5,
-            opt_d_lr: float = 2e-4,
+            opt_d_lr: float = 1e-4,
             data_num_workers: int = 4,
             train_nums = None,
             gpu_nums: int = 1,
@@ -212,12 +212,11 @@ class DGMR_model(pl.LightningModule):
                 cc = self.grid_lambda
                 generator_loss = hinge_loss + cc * grid_cell_reg
             else:
-                cc = -999.
+                cc = -999. 
                 hinge_loss = -999.
                 generator_loss = grid_cell_reg
 
-            ##TODO
-            ### Warm up schedule for opt.
+            ##TODO: Warm up schedule for opt.
             #if self.global_step < 500:
             #    lr_scale = min(1., float(self.global_step+1) / 500.)
             #    for pg in g_opt.param_groups:
@@ -237,7 +236,7 @@ class DGMR_model(pl.LightningModule):
             prog_bar = True
         )
 
-        if self.global_step >= self.warmup_iter:
+        if not isinstance(hinge_loss, float):
             ## g_loss
             self.g_loss[0] += hinge_loss.cpu().detach().numpy()
             self.g_loss[1] += 1
@@ -282,10 +281,10 @@ class DGMR_model(pl.LightningModule):
         """
         X, Y = batch
         Y_hat = self.generator(X)
-        ##  transform
-        X = X * 64
-        Y = Y * 64
-        Y_hat = Y_hat * 64
+        ###  transform
+        #X = X * 64
+        #Y = Y * 64
+        #Y_hat = Y_hat * 64
 
         ## calculate error metrics
         ## calculate mse

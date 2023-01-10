@@ -18,17 +18,20 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 model = DGMR_model(
     train_path = "../data/training_data/training/train_data",
     valid_path = "../data/training_data/training/sage_train_demo",
-    pic_path = "./train_log/pics/v10_continue",
+    pic_path = "./train_log/pics/v11",
     in_shape = (256, 256),
     in_channels = 1,
     base_channels = 12,
     down_step = 4,
     pred_step = 12,
     use_cuda = True,
-    grid_lambda = 35,
+    grid_lambda = 20,
     batch_size = 6,
     gen_sample_nums = 3,
-    train_nums = 50000
+    train_nums = 50000,
+    dis_train_step = 2,
+    gen_train_step = 1,
+    warmup_iter = 200
 )
 
 ## callback function
@@ -36,7 +39,7 @@ checkpoint_callback = ModelCheckpoint(
     monitor="val_loss",
     save_top_k=5,
     mode="min",
-    dirpath='model_weight/v10_SageMaker_continue',
+    dirpath='model_weight/v11',
     filename="DGMR-{epoch:03d}-{val_loss:.4f}",
     every_n_epochs=1,
 )
