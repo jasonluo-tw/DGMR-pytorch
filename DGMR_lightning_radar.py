@@ -248,7 +248,7 @@ class DGMR_model(pl.LightningModule):
         self.reg_loss[0] += grid_cell_reg.cpu().detach().numpy()
         self.reg_loss[1] += 1
 
-        if self.global_step % 100 == 0 and self.global_rank == 0:
+        if self.global_step % 500 == 0 and self.global_rank == 0:
             logger.info('epoch:{:d},global_step:{:d},hinge_loss:{:.4f},grid_reg:{:.4f},lambda:{:.2f},dis_loss:{:.4f}'.format(
                 self.current_epoch,
                 self.global_step,
@@ -281,10 +281,10 @@ class DGMR_model(pl.LightningModule):
         """
         X, Y = batch
         Y_hat = self.generator(X)
-        ###  transform
-        #X = X * 64
-        #Y = Y * 64
-        #Y_hat = Y_hat * 64
+        ##  transform
+        X = X * 64
+        Y = Y * 64
+        Y_hat = Y_hat * 64
 
         ## calculate error metrics
         ## calculate mse
@@ -377,8 +377,6 @@ class DGMR_model(pl.LightningModule):
         """
         xx, yy, preds -> np.array
         """
-        #real = torch.cat([xx, yy], dim=1).cpu().detach() * 64
-        #fake = torch.cat([xx, preds], dim=1).cpu().detach() * 64
         real = np.concatenate([xx, yy], axis=1)
         fake = np.concatenate([xx, preds], axis=1)
 
@@ -386,7 +384,8 @@ class DGMR_model(pl.LightningModule):
         ##
         fake = np.squeeze(fake)
         fake = np.where(fake > 64, 64, fake)
-        fake = np.where(fake < 0, 0, fake)
+        fake = np.where(fake < 0.2, np.nan, fake)
+        real = np.where(real < 0.2, np.nan, real)
 
         ##(Solved) Error occured, when using distributed training. We have to if set global_rank == 0
         ##(Solved) error message -> ValueError: ContourSet must be in current Axes
@@ -399,7 +398,7 @@ class DGMR_model(pl.LightningModule):
         for index, pics in enumerate([real, fake]):
             plt.figure(figsize=(12, 10))
             for t in range(pics.shape[0]):
-                if self.pred_step == 8:
+                if self.pred_step == 8 or self.pred_step == 6:
                     plt.subplot(3, 4, t+1)
                 elif self.pred_step == 12:
                     plt.subplot(4, 4, t+1)

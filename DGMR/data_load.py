@@ -4,7 +4,7 @@ import os
 import gzip
 
 class RadarDataSet(torch.utils.data.Dataset):
-    def __init__(self, folder, data_files=None, nums=None, shuffle=True, seed=10, compress_int16=True):
+    def __init__(self, folder, data_files=None, nums=None, shuffle=True, seed=20, compress_int16=True):
         ##TODO:
         self.compress_int16 = compress_int16
         np.random.seed(seed)
@@ -32,7 +32,7 @@ class RadarDataSet(torch.utils.data.Dataset):
         #data = data.astype('float32')
         ## if data >= 64, data = 64
         data = np.where(data > 64, 64, data)
-        #data = data / 64.
+        data = data / 64.
         ## dims -> (1, 256, 256, 12)
         data = np.moveaxis(data, -1, 0)
         ## dims -> (12, 1, 256, 256)
