@@ -53,8 +53,7 @@ def grid_cell_regularizer(fake_samples, targets):
     #loss = torch.mean(torch.square(fake_samples[0] - targets))
     fake_samples = torch.mean(fake_samples, dim=0)
 
-    weights = torch.clamp(targets*64, 1.0, 24.0)  ## original 24
-    #weights = torch.clamp(targets, 1.0, 24.0)
+    weights = torch.clamp(targets, 1.0, 24.0)  ## original 24
 
     ## mean absolute
     loss = torch.mean(torch.abs(fake_samples - targets) * weights)

@@ -31,8 +31,8 @@ class RadarDataSet(torch.utils.data.Dataset):
         data = np.nan_to_num(data, nan=0.0)
         #data = data.astype('float32')
         ## if data >= 64, data = 64
-        data = np.where(data > 64, 64, data)
-        data = data / 64.
+        data = np.where(data > 100, 100, data)
+        #data = data / 64.
         ## dims -> (1, 256, 256, 12)
         data = np.moveaxis(data, -1, 0)
         ## dims -> (12, 1, 256, 256)
