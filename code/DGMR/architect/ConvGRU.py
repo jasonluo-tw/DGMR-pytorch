@@ -48,7 +48,6 @@ class ConvGRUCell(torch.nn.Module):
         x = F.pad(x, (0, h_b, w_l, 0), "reflect")
 
         #print(x.shape, h_st.shape)
-        ## 
         xx = torch.cat([x, h_st], dim=1)
         xx = self.conv1(xx)
         gamma, beta = torch.split(xx, self.out_channel, dim=1)
@@ -65,15 +64,14 @@ class ConvGRUCell(torch.nn.Module):
         return out, new_st
 
 class ConvGRU(torch.nn.Module):
-    def __init__(self, image_shape, in_channel, out_channel, kernel_size):
+    def __init__(self, in_channel, out_channel, kernel_size):
         super().__init__()
 
-        self.height, self.width = image_shape
         self.out_channel = out_channel
         self.convgru_cell = ConvGRUCell(in_channel, out_channel, kernel_size)
 
-    def _get_init_state(self, batch_size, dtype):
-        state = Variable(torch.zeros(batch_size, self.out_channel, self.height, self.width)).type(dtype)
+    def _get_init_state(self, batch_size, imd_w, imd_h, dtype):
+        state = Variable(torch.zeros(batch_size, self.out_channel, self.h, self.w)).type(dtype)
 
         return state
 
@@ -85,9 +83,13 @@ class ConvGRU(torch.nn.Module):
             outputs shape -> (time, batch_size, c, width, height)
         """
         seq_len = x_sequence.shape[1]
+        
+        img_w = x_sequence.shape[3]
+        img_h = x_sequence.shape[4]
+
         dtype = x_sequence.type()
         if init_hidden is None:
-            hidden_state = self._get_init_state(x_sequence.shape[0], dtype)
+            hidden_state = self._get_init_state(x_sequence.shape[0], img_w, img_h, dtype)
         else:
             hidden_state = init_hidden
 

@@ -37,12 +37,10 @@ class DGMR_model(pl.LightningModule):
             train_path=None,
             valid_path=None,
             pic_path=None, 
-            in_shape: list = (256, 256),
             in_channels: int = 1,
             base_channels: int = 24,
             down_step: int = 4,
             prev_step: int = 4,
-            pred_step: int = 18,
             use_cuda: bool = True,
             grid_lambda: float = 20,
             batch_size: int = 16,
@@ -77,15 +75,13 @@ class DGMR_model(pl.LightningModule):
         ## optimizer 
         self.opt_g_lr = opt_g_lr
         self.opt_d_lr = opt_d_lr
-        ##TODO: pred step
-        self.pred_step = pred_step
 
         ## bools
         self.train_gen_only = train_gen_only
         
         ## init Generator
-        self.generator = Generator(in_channels, in_shape, base_channels,
-                                   down_step, prev_step, pred_step, batch_size, use_cuda)
+        self.generator = Generator(in_channels, base_channels,
+                                   down_step, prev_step, batch_size, use_cuda)
 
         ## init Discriminator
         if not self.train_gen_only:
@@ -158,16 +154,17 @@ class DGMR_model(pl.LightningModule):
 
         return val_loader
 
-    def forward(self, x):
-        y = self.generator(x)
+    def forward(self, x, pred_step=12):
+        y = self.generator(x, pred_step=pred_step)
         return y
 
     def training_step(self, batch, batch_idx):
-        ## X,Y dims -> (batch, depth, channel, height, width)
+        ## X,Y dims -> (batch, step, channel, height, width)
         X, Y = batch
         ##
         #X = X * 64
         #Y = Y * 64
+        pred_step = Y.shape[1]
 
         #self.global_iter += 1
         g_opt, d_opt = self.optimizers()
@@ -180,7 +177,7 @@ class DGMR_model(pl.LightningModule):
         ## current epoch starts from 0
         if self.global_step >= self.warmup_iter and not self.train_gen_only:
             for _ in range(self.dis_train_step):
-                preds = self.generator(X) ## generate predictions
+                preds = self.generator(X, pred_step=pred_step) ## generate predictions
 
                 fake_score = self.discriminator(X, preds)
                 real_score = self.discriminator(X, Y)
@@ -193,7 +190,7 @@ class DGMR_model(pl.LightningModule):
         #### optimize generator ####
         for _ in range(self.gen_train_step):
             ## mae weighted
-            preds = [self.generator(X) for _ in range(self.gen_sample_nums)]
+            preds = [self.generator(X, pred_step=pred_step) for _ in range(self.gen_sample_nums)]
             grid_cell_reg = grid_cell_regularizer(torch.stack(preds, dim=0), Y)
 
             ##TODO
@@ -280,7 +277,8 @@ class DGMR_model(pl.LightningModule):
         Validation set
         """
         X, Y = batch
-        Y_hat = self.generator(X)
+        pred_step = Y.shape[1]
+        Y_hat = self.generator(X, pred_step=pred_step)
         ###  transform
         #X = X * 64
         #Y = Y * 64
@@ -380,6 +378,7 @@ class DGMR_model(pl.LightningModule):
         """
         xx, yy, preds -> np.array
         """
+        pred_step = yy.shape[1]
         real = np.concatenate([xx, yy], axis=1)
         fake = np.concatenate([xx, preds], axis=1)
 
@@ -401,9 +400,9 @@ class DGMR_model(pl.LightningModule):
         for index, pics in enumerate([real, fake]):
             plt.figure(figsize=(12, 10))
             for t in range(pics.shape[0]):
-                if self.pred_step == 8 or self.pred_step == 6:
+                if pred_step == 8 or pred_step == 6:
                     plt.subplot(3, 4, t+1)
-                elif self.pred_step == 12:
+                elif pred_step == 12:
                     plt.subplot(4, 4, t+1)
 
                 plt.contourf(pics[t], levels=np.arange(0, 65, 4), cmap='rainbow')

@@ -44,7 +44,6 @@ estimator = PyTorch(
     hyperparameters={
         'epochs': 50,
         'hidden-base': 12,
-        'pred-step': 12,
         'batch-size': 10,
         'gen-sample-nums': 3,
         'num-workers': 18,

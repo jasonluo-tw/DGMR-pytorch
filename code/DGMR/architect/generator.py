@@ -13,17 +13,14 @@ from .ConvGRU import ConvGRU
 from .common import GBlock, Up_GBlock, LBlock, AttentionLayer, DBlock
 
 class Sampler(nn.Module):
-    def __init__(self, in_shape, in_channels, pred_step, base_channels=24, up_step=4):
+    def __init__(self, in_channels, base_channels=24, up_step=4):
         """
         up_step should be the same as down_step in context-condition-stack
 
         """
         super().__init__()
-        s_w = in_shape[0] // 2**(up_step+1)
-        s_h = in_shape[1] // 2**(up_step+1)
         base_c = base_channels
 
-        self.pred_step = pred_step
         self.up_steps = up_step
         self.convgru_list = nn.ModuleList()
         self.conv1x1_list = nn.ModuleList()
@@ -32,13 +29,11 @@ class Sampler(nn.Module):
 
         for i in range(self.up_steps):
             ## different scale
-            width = s_w * (i+1)
-            height = s_h * (i+1)
             chs1 = base_c * 2**(self.up_steps-i+1) * in_channels
             chs2 = base_c * 2**(self.up_steps-i) * in_channels
             ## convgru 
             self.convgru_list.append(
-                ConvGRU((width, height), chs1, chs2, 3)
+                ConvGRU(chs1, chs2, 3)
             )
             ## conv1x1
             self.conv1x1_list.append(
@@ -66,7 +61,7 @@ class Sampler(nn.Module):
             )
             self.depth_to_space = nn.PixelShuffle(upscale_factor=2)
 
-    def forward(self, latents, init_states):
+    def forward(self, latents, init_states, pred_step):
         """
         latent dim -> (N, C, W, H)
         init_states dim -> (N, C, W, H)
@@ -82,7 +77,7 @@ class Sampler(nn.Module):
             )
         ## repeat time step
         latents = einops.repeat(
-            latents, "b d c h w -> b (repeat d) c h w", repeat=self.pred_step
+            latents, "b d c h w -> b (repeat d) c h w", repeat=pred_step
         )
         seq_out = latents
         ## init_states should be reversed
@@ -114,14 +109,15 @@ class Sampler(nn.Module):
 
 ##TODO: Now only generate one sample, and not one batch
 class LatentConditionStack(nn.Module):
-    def __init__(self, in_shape, out_channels, use_cuda, attn=True):
+    def __init__(self, out_channels, down_step, use_cuda, attn=True):
         """
         in_shape dims -> e.g. (8, 8) -> (H, W)
         x) base_c is 1/96 of out_channels
         base_c is set to 4
         """
         super().__init__()
- 
+
+        self.down_step = down_step
         self.base_c = out_channels // 96
         if self.base_c < 4:
             self.base_c = 4
@@ -129,7 +125,6 @@ class LatentConditionStack(nn.Module):
         self.out_channels = out_channels
         self.attn = attn
         self.use_cuda = use_cuda
-        self.inshape = [self.base_c] + list(in_shape)
 
         ## define the distribution
         self.dist = normal.Normal(loc=0.0, scale=1.0)
@@ -152,7 +147,18 @@ class LatentConditionStack(nn.Module):
         self.l4 = LBlock(cc*24, self.out_channels)
 
     def forward(self, x, batch_size=1, z=None):
-        target_shape = [batch_size] + [*self.inshape]
+        """
+        x shape -> (batch_size, time, c, width, height)
+        """
+        width = x.shape[3]
+        height = x.shape[4]
+        ## shape after downstep
+        s_w = width // (2 * 2**self.down_step)
+        s_h = height // (2 * 2**self.down_step)
+
+        in_shape = [self.base_c] + [s_w, s_h]
+
+        target_shape = [batch_size] + in_shape
         if z is None:
             z = self.dist.sample(target_shape)
 
@@ -160,7 +166,6 @@ class LatentConditionStack(nn.Module):
             #z = z.to("cuda")
             ## with lightening
             z = z.type_as(x)
-
         
         ## first conv
         z = self.conv3x3(z)
