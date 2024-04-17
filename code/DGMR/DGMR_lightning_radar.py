@@ -5,12 +5,12 @@ import torch.nn.functional as F
 from torch.utils.data import random_split, DataLoader, TensorDataset
 import pytorch_lightning as pl
 ## DGMR
-from DGMR.model import Generator, Discriminator
-from DGMR.loss import hinge_loss_dis, hinge_loss_gen, grid_cell_regularizer
-from DGMR.loss import hinge_loss_dis_test
-from DGMR.loss import mse_loss
-from DGMR.metrics import get_CSI_along_time
-from DGMR.data_load import RadarDataSet
+from .model import Generator, Discriminator
+from .loss import hinge_loss_dis, hinge_loss_gen, grid_cell_regularizer
+from .loss import hinge_loss_dis_test
+from .loss import mse_loss
+from .metrics import get_CSI_along_time
+from .data_load import RadarDataSet
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,6 +27,12 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 #    format="",
 #    datefmt='%Y-%m-%d %H:%M:%S'
 #)
+
+def printf(string, kind='print'):
+    if kind == 'print':
+        print(string, flush=True)
+    else:
+        logger.info(string)
 
 class DGMR_model(pl.LightningModule):
     """
@@ -54,6 +60,8 @@ class DGMR_model(pl.LightningModule):
             data_num_workers: int = 4,
             train_nums = None,
             gpu_nums: int = 1,
+            world_size: int = 1,
+            rescale: int = 64,
             **kwargs
     ):
         super().__init__()
@@ -61,6 +69,7 @@ class DGMR_model(pl.LightningModule):
         self.grid_lambda = grid_lambda
         self.batch_size = batch_size
         self.gpu_nums = gpu_nums
+        self.world_size = world_size
         self.train_nums = train_nums
 
         self.data_num_workers = data_num_workers
@@ -68,6 +77,7 @@ class DGMR_model(pl.LightningModule):
         self.gen_train_step = gen_train_step
         self.dis_train_step = dis_train_step
         self.gen_sample_nums = gen_sample_nums
+        self.rescale = rescale
         ## path
         self.train_path = train_path
         self.valid_path = valid_path
@@ -107,13 +117,16 @@ class DGMR_model(pl.LightningModule):
         radar_set = RadarDataSet(folder=self.train_path, 
                                  shuffle=True, 
                                  nums=self.train_nums, 
-                                 compress_int16=True)
+                                 compress_int16=True,
+                                 rescale=self.rescale)
 
         self.radar_set = radar_set
 
         ## valid 
         if self.valid_path is not None:
-            radar_valid = RadarDataSet(folder=self.valid_path, compress_int16=True)
+            radar_valid = RadarDataSet(folder=self.valid_path, 
+                                       compress_int16=True, 
+                                       rescale=self.rescale)
             self.radar_valid = radar_valid
         else:
             self.radar_valid = None
@@ -131,8 +144,8 @@ class DGMR_model(pl.LightningModule):
             self.valid_set = self.radar_valid
 
         if self.global_rank == 0:
-            logger.info(f'Training set size: {len(self.train_set)}')
-            logger.info(f'Validation set size: {len(self.valid_set)}')
+            printf(f'Training set size: {len(self.train_set)}')
+            printf(f'Validation set size: {len(self.valid_set)}')
 
     def train_dataloader(self):
         train_loader = torch.utils.data.DataLoader(
@@ -161,9 +174,6 @@ class DGMR_model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         ## X,Y dims -> (batch, step, channel, height, width)
         X, Y = batch
-        ##
-        #X = X * 64
-        #Y = Y * 64
         pred_step = Y.shape[1]
 
         #self.global_iter += 1
@@ -191,7 +201,7 @@ class DGMR_model(pl.LightningModule):
         for _ in range(self.gen_train_step):
             ## mae weighted
             preds = [self.generator(X, pred_step=pred_step) for _ in range(self.gen_sample_nums)]
-            grid_cell_reg = grid_cell_regularizer(torch.stack(preds, dim=0), Y)
+            grid_cell_reg = grid_cell_regularizer(torch.stack(preds, dim=0), Y, rescale=self.rescale)
 
             ##TODO
             ## mse loss
@@ -246,7 +256,7 @@ class DGMR_model(pl.LightningModule):
         self.reg_loss[1] += 1
 
         if (self.global_step+1) % 100 == 0 and self.global_rank == 0:
-            logger.info('epoch:{:d},global_step:{:d},hinge_loss:{:.4f},grid_reg:{:.4f},lambda:{:.2f},dis_loss:{:.4f}'.format(
+            printf('epoch:{:d},global_step:{:d},hinge_loss:{:.4f},grid_reg:{:.4f},lambda:{:.2f},dis_loss:{:.4f}'.format(
                 self.current_epoch,
                 self.global_step,
                 hinge_loss,
@@ -261,12 +271,12 @@ class DGMR_model(pl.LightningModule):
         reg_loss = self.reg_loss[0] / (self.reg_loss[1]+1e-10)
 
         if self.global_rank == 0:
-            logger.info('#### Train Epoch Average result #####')
-            logger.info(f'epoch:{self.current_epoch}')
-            logger.info(f'mean g_loss:{g_loss:.3f}')
-            logger.info(f'mean d_loss:{d_loss:.3f}')
-            logger.info(f'mean reg_loss:{reg_loss:.3f}')
-            logger.info('#### Train Epoch End #####')
+            printf('#### Train Epoch Average result #####')
+            printf(f'epoch:{self.current_epoch}')
+            printf(f'mean g_loss:{g_loss:.3f}')
+            printf(f'mean d_loss:{d_loss:.3f}')
+            printf(f'mean reg_loss:{reg_loss:.3f}')
+            printf('#### Train Epoch End #####')
         
         self.g_loss   = [0, 0] 
         self.d_loss   = [0, 0]
@@ -280,9 +290,9 @@ class DGMR_model(pl.LightningModule):
         pred_step = Y.shape[1]
         Y_hat = self.generator(X, pred_step=pred_step)
         ###  transform
-        #X = X * 64
-        #Y = Y * 64
-        #Y_hat = Y_hat * 64
+        X = X * self.rescale
+        Y = Y * self.rescale
+        Y_hat = Y_hat * self.rescale
 
         ## calculate error metrics
         ## calculate mse
@@ -317,26 +327,32 @@ class DGMR_model(pl.LightningModule):
         del Y_hat
 
         ## ts_arr[0] -> 1.0, ts_arr[1] -> 4.0
-        if self.gpu_nums == 1:
+        #if self.gpu_nums == 1:
+        if self.world_size == 1:
             return [loss, ts_arr[0], ts_arr[1]]  
         else:
             return loss, ts_arr[0], ts_arr[1]  
 
     def validation_epoch_end(self, all_loss):
         ## for distribution training, gather all loss from different ranks(GPU)
+        ## all_loss_node list: (batch_steps, 3)
+        ## ind: 0 -> mse, 1 -> TS, 2 -> TS4
         all_loss_nodes = self.all_gather(all_loss)
 
         ## calculate error
         if self.global_rank == 0:
             ## mse
             mse = torch.mean(torch.stack([i[0] for i in all_loss_nodes]))
-            mse = mse.cpu().detach()#.numpy()
+            mse = mse.cpu().detach()
 
             ## TS
             ## [tensor(1, 2, 3, 4), ..., *12] -> multiple
             ts = [torch.stack(i[1]) for i in all_loss_nodes]
-            if self.gpu_nums > 1:
+            #if self.gpu_nums > 1:
+            if self.world_size > 1:
+                ## average different gpus
                 ts = torch.mean(ts, dim=-1)
+
             ## average different samples
             ts = torch.mean(torch.stack(ts), dim=0).cpu().detach()
             ts_store = ts.clone()
@@ -346,8 +362,10 @@ class DGMR_model(pl.LightningModule):
             ## TS-4
             ## [tensor(1, 2, 3, 4), ..., *12]
             ts4 = [torch.stack(i[2]) for i in all_loss_nodes]
-            if self.gpu_nums > 1:
+            #if self.gpu_nums > 1:
+            if self.world_size > 1:
                 ts4 = torch.mean(ts4, dim=-1)
+
             ## average different samples
             ts4 = torch.mean(torch.stack(ts4), dim=0).cpu().detach().numpy()
             ts4_out = ','.join([f'{i:.3f}' for i in ts4])
@@ -358,12 +376,12 @@ class DGMR_model(pl.LightningModule):
             self.log("val_TS_1", ts_store[0], prog_bar=True)
             
             ## logging
-            logger.info('#### Validation #####')
-            logger.info(f'epoch:{self.current_epoch}')
-            logger.info(f'mse:{mse:.3f}')
-            logger.info(f'CSI-1:{ts_out}')
-            logger.info(f'CSI-4:{ts4_out}')
-            logger.info('#### Validation end ####')
+            printf('#### Validation #####')
+            printf(f'epoch:{self.current_epoch}')
+            printf(f'mse:{mse:.3f}')
+            printf(f'CSI-1:{ts_out}')
+            printf(f'CSI-4:{ts4_out}')
+            printf('#### Validation end ####')
 
         if self.global_rank == 0 or self.global_rank == 1:
             self.valid_plot_flag = True
@@ -383,8 +401,8 @@ class DGMR_model(pl.LightningModule):
         fake = np.concatenate([xx, preds], axis=1)
 
         real = np.squeeze(real) 
-        ##
         fake = np.squeeze(fake)
+
         #fake = np.where(fake > 64, 64, fake)
         #fake = np.where(fake < 0.2, np.nan, fake)
         #real = np.where(real < 0.2, np.nan, real)
@@ -418,5 +436,4 @@ class DGMR_model(pl.LightningModule):
                             bbox_inches='tight')
 
             plt.close()
-
 

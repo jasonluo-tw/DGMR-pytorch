@@ -14,8 +14,9 @@ def main(args):
     training for DGMR through SageMaker or local server
     """
     ## check the number of hosts
-    world_size = len(args.hosts)
-
+    hosts = len(args.hosts)
+    world_size = int(os.environ["WORLD_SIZE"])
+    
     print("hosts nums:", world_size)
     print("GPU nums:", args.num_gpus)
 
@@ -36,7 +37,8 @@ def main(args):
         data_num_workers = args.num_workers,
         dis_train_step = args.dis_train_step,
         warmup_iter = args.warmup_iter,
-        num_gpus = args.num_gpus
+        num_gpus = args.num_gpus,
+        world_size = world_size
     )
 
     
@@ -67,32 +69,55 @@ def main(args):
    
     ## Trainer
     if world_size > 1: ## distributed training
-        trainer = pl.Trainer(gpus=args.num_gpus,
-                             num_nodes=world_size,
-                             strategy='ddp',
-                             max_epochs=args.epochs,
-                             enable_progress_bar=False,
-                             callbacks=[checkpoint_callback, 
-                                        checkpoint2, 
-                                        early_stop_callback],
-                             log_every_n_steps=4)
+        print("Instance counts >= 1 !!!")
+        from pytorch_lightning.plugins.environments.lightning_environment import LightningEnvironment
+        from pytorch_lightning.strategies import DDPStrategy
+
+        env = LightningEnvironment()
+        env.world_size = lambda: int(os.environ["WORLD_SIZE"])
+        env.global_rank = lambda: int(os.environ["RANK"])
+
+        ddp = DDPStrategy(
+            cluster_environment=env,
+            accelerator="gpu"
+        )
+
+        world_size = int(os.environ["WORLD_SIZE"])
+        num_gpus = int(os.environ["SM_NUM_GPUS"])
+        num_nodes = int(world_size/num_gpus)
+        
+        trainer = pl.Trainer(
+            devices=num_gpus,
+            num_nodes=num_nodes,
+            strategy=ddp,
+            max_epochs=args.epochs,
+            enable_progress_bar=False,
+            callbacks=[checkpoint_callback, 
+                       checkpoint2, 
+                       early_stop_callback],
+            precision=16,
+            log_every_n_steps=4)
     else:
         if args.num_gpus > 1:
-            trainer = pl.Trainer(gpus=args.num_gpus,
+            trainer = pl.Trainer(accelerator='gpu',
+                                 devices=args.num_gpus,
                                  max_epochs=args.epochs,
                                  strategy='ddp',
                                  enable_progress_bar=False,
                                  callbacks=[checkpoint_callback, 
                                             checkpoint2, 
                                             early_stop_callback],
+                                 precision=16,
                                  log_every_n_steps=4)
         else:
-            trainer = pl.Trainer(gpus=args.num_gpus,
+            trainer = pl.Trainer(accelerator='gpu',
+                                 devices=args.num_gpus,
                                  max_epochs=args.epochs,
                                  enable_progress_bar=False,
                                  callbacks=[checkpoint_callback, 
                                             checkpoint2, 
                                             early_stop_callback],
+                                 precision=16,
                                  log_every_n_steps=4)
 
     #trainer = pl.Trainer(gpus=1, max_steps=10, overfit_batches=1, 

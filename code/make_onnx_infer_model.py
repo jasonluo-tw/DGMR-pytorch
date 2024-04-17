@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 ###
-from DGMR_lightning_radar2 import DGMR_model
+from DGMR.DGMR_lightning_radar import DGMR_model
 
 ## load model
 model = DGMR_model(in_shape=(384, 384), base_channels=16, pred_step=12, down_step=4, grid_lambda=20)

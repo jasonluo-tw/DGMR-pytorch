@@ -40,7 +40,7 @@ def hinge_loss_gen(fake_score):
 
     return loss
 
-def grid_cell_regularizer(fake_samples, targets):
+def grid_cell_regularizer(fake_samples, targets, rescale=None):
     """
     regularize for grid cell to let the prediction closer to the ground truth
     Monte Carlo estimates for expectations
@@ -50,21 +50,21 @@ def grid_cell_regularizer(fake_samples, targets):
     Return:
         loss -> (batch)
     """
-    #loss = torch.mean(torch.square(fake_samples[0] - targets))
     fake_samples = torch.mean(fake_samples, dim=0)
+    ## rescale to original values
+    if rescale is not None:
+        fake_samples = fake_samples * rescale
+        targets = targets * rescale
 
     weights = torch.clamp(targets, 1.0, 24.0)  ## original 24
 
-    ## mean absolute
+    ## weighted mean absolute error
     loss = torch.mean(torch.abs(fake_samples - targets) * weights)
-    ## mean square
-    #loss = torch.mean((fake_samples - targets)**2)
 
     return loss
 
 
 def mse_loss(preds, targets):
-
     loss = nn.MSELoss()
     output = loss(preds, targets)
 
